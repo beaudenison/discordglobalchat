@@ -2,15 +2,31 @@
 
 One bot. Every server. One conversation.
 
-Global Chat connects Discord servers into one live, cross-server conversation. Install the bot in your server, choose your send/receive channels, and instantly join a decentralized network of communities talking in real time.
+Global Chat connects Discord servers into one live, cross-server conversation. The bot is ready to invite and use right away, so your server can join a decentralized network of communities talking in real time.
 
 Website: https://discordglobalchat.xyz
+
+## Invite The Bot (Start Here)
+
+Use the website to invite the bot and join the network:
+
+https://discordglobalchat.xyz
+
+If your goal is to use Global Chat, this is the fastest path. Invite the bot, set your broadcast/receive channels, and your server is connected.
 
 ## What Is Discord Global Chat?
 
 Discord Global Chat is a production-ready, containerized global chat relay bot built with Node.js and discord.js. It links independent Discord communities together so messages can flow between connected servers without a centralized hub.
 
 As more servers install the bot, the network expands automatically. More servers means more people, more reach, and a larger community conversation.
+
+## Open Source On GitHub
+
+Global Chat is open source on GitHub so anyone can inspect the code, self-host their own version, or build custom forks for their community.
+
+Repository: https://github.com/beaudenison/discordglobalchat
+
+Most users should invite the hosted bot through the website to join the live network quickly, while developers can use the source to create their own variant.
 
 ## Why Use Global Chat?
 
