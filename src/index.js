@@ -6,6 +6,7 @@ import {
   Events,
   GatewayIntentBits,
   MessageFlags,
+  Partials,
   PermissionFlagsBits,
   REST,
   Routes,
@@ -27,13 +28,16 @@ if (!BOT_TOKEN || !CLIENT_ID) {
 }
 
 const store = new JsonStore(DATA_FILE);
+const relayedMessageToSource = new Map();
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.MessageContent
-  ]
+  ],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
 
 function shouldLog(level) {
@@ -117,7 +121,30 @@ function buildRelayMessage(sourceMessage, sourceGuildConfig) {
   const serverLabel = fallbackInvite
     ? `[${serverName}](<${fallbackInvite}>)`
     : serverName;
-  return `From <@${sourceMessage.author.id}> in ${serverLabel}\n${messageContent}`;
+  return `From <@${sourceMessage.author.id}> in ${serverLabel}: \n${messageContent}`;
+}
+
+function trackRelayMessage(relayedMessageId, sourceMessage) {
+  relayedMessageToSource.set(relayedMessageId, {
+    sourceGuildId: sourceMessage.guild.id,
+    sourceChannelId: sourceMessage.channel.id,
+    sourceMessageId: sourceMessage.id
+  });
+
+  // Keep a bounded cache so memory use does not grow without limit.
+  const maxTrackedMessages = 5000;
+  while (relayedMessageToSource.size > maxTrackedMessages) {
+    const oldestKey = relayedMessageToSource.keys().next().value;
+    relayedMessageToSource.delete(oldestKey);
+  }
+}
+
+function resolveReactionEmoji(reaction) {
+  if (reaction.emoji.id && reaction.emoji.name) {
+    return `${reaction.emoji.name}:${reaction.emoji.id}`;
+  }
+
+  return reaction.emoji.name || null;
 }
 
 async function relayMessage(sourceMessage) {
@@ -169,13 +196,15 @@ async function relayMessage(sourceMessage) {
       const webhook = await resolveReceiveWebhook(targetChannel, targetConfig);
       const webhookClient = new WebhookClient({ id: webhook.id, token: webhook.token });
 
-      await webhookClient.send({
+      const relayedMessage = await webhookClient.send({
         username: 'Global Chat',
         avatarURL: sourceMessage.author.displayAvatarURL({ extension: 'png', size: 128 }),
         content: outboundContent,
         flags: MessageFlags.SuppressEmbeds,
         allowedMentions: { parse: [] }
       });
+
+      trackRelayMessage(relayedMessage.id, sourceMessage);
 
       if (sourceMessage.attachments.size > 0) {
         const files = sourceMessage.attachments.map((attachment) => attachment.url);
@@ -311,6 +340,51 @@ client.on(Events.MessageCreate, async (message) => {
       guildId: message.guild.id,
       channelId: message.channel.id,
       messageId: message.id,
+      error: error.message
+    });
+  }
+});
+
+client.on(Events.MessageReactionAdd, async (reaction, user) => {
+  if (user.bot) {
+    return;
+  }
+
+  try {
+    if (reaction.partial) {
+      await reaction.fetch();
+    }
+
+    const sourceRef = relayedMessageToSource.get(reaction.message.id);
+    if (!sourceRef) {
+      return;
+    }
+
+    const sourceGuild = await client.guilds.fetch(sourceRef.sourceGuildId);
+    const sourceChannel = await sourceGuild.channels.fetch(sourceRef.sourceChannelId);
+    if (!sourceChannel || sourceChannel.type !== ChannelType.GuildText) {
+      return;
+    }
+
+    const emoji = resolveReactionEmoji(reaction);
+    if (!emoji) {
+      return;
+    }
+
+    const sourceMessage = await sourceChannel.messages.fetch(sourceRef.sourceMessageId);
+    await sourceMessage.react(emoji);
+
+    log('info', 'reaction_mirrored', {
+      fromGuildId: reaction.message.guildId,
+      toGuildId: sourceRef.sourceGuildId,
+      receiveMessageId: reaction.message.id,
+      sourceMessageId: sourceRef.sourceMessageId,
+      emoji
+    });
+  } catch (error) {
+    log('error', 'reaction_mirror_failed', {
+      messageId: reaction.message?.id,
+      emoji: reaction.emoji?.name,
       error: error.message
     });
   }
