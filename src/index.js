@@ -153,7 +153,7 @@ async function sendDeliveryAcknowledgement(sourceMessage, deliveredCount) {
       allowedMentions: { parse: [], repliedUser: false }
     });
 
-    const removeAckDelayMs = 12000;
+    const removeAckDelayMs = 1000;
     const timer = setTimeout(() => {
       ackMessage.delete().catch(() => {});
     }, removeAckDelayMs);
