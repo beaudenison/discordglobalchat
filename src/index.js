@@ -113,12 +113,10 @@ function buildRelayMessage(sourceMessage, sourceGuildConfig) {
   const fallbackInvite = sourceGuildConfig.serverInviteUrl || DEFAULT_SERVER_INVITE_URL || null;
   const serverName = sourceMessage.guild?.name || 'Unknown Server';
 
-  const serverLabel = fallbackInvite
-    ? `[${serverName}](${fallbackInvite})`
-    : serverName;
-
   const messageContent = sourceMessage.content?.trim() || '[No text content]';
-  return `From <@${sourceMessage.author.id}> in ${serverLabel}\n${messageContent}`;
+  const attribution = `From <@${sourceMessage.author.id}> in ${serverName}`;
+  const inviteLine = fallbackInvite ? `\nServer: <${fallbackInvite}>` : '';
+  return `${attribution}${inviteLine}\n${messageContent}`;
 }
 
 async function relayMessage(sourceMessage) {
