@@ -3,9 +3,9 @@ import process from 'node:process';
 import {
   ChannelType,
   Client,
-  EmbedBuilder,
   Events,
   GatewayIntentBits,
+  MessageFlags,
   PermissionFlagsBits,
   REST,
   Routes,
@@ -109,7 +109,7 @@ async function resolveReceiveWebhook(channel, guildConfig) {
   return created;
 }
 
-function buildRelayEmbed(sourceMessage, sourceGuildConfig) {
+function buildRelayMessage(sourceMessage, sourceGuildConfig) {
   const fallbackInvite = sourceGuildConfig.serverInviteUrl || DEFAULT_SERVER_INVITE_URL || null;
   const serverName = sourceMessage.guild?.name || 'Unknown Server';
 
@@ -117,23 +117,8 @@ function buildRelayEmbed(sourceMessage, sourceGuildConfig) {
     ? `[${serverName}](${fallbackInvite})`
     : serverName;
 
-  const embed = new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setDescription(sourceMessage.content || '*[No text content]*')
-    .setFooter({ text: `User ID: ${sourceMessage.author.id}` })
-    .setTimestamp(new Date());
-
-  if (sourceMessage.attachments.size > 0) {
-    const attachment = sourceMessage.attachments.first();
-    if (attachment?.contentType?.startsWith('image/')) {
-      embed.setImage(attachment.url);
-    }
-  }
-
-  return {
-    content: `From <@${sourceMessage.author.id}> in ${serverLabel}`,
-    embeds: [embed]
-  };
+  const messageContent = sourceMessage.content?.trim() || '[No text content]';
+  return `From <@${sourceMessage.author.id}> in ${serverLabel}\n${messageContent}`;
 }
 
 async function relayMessage(sourceMessage) {
@@ -149,7 +134,7 @@ async function relayMessage(sourceMessage) {
     return;
   }
 
-  const outbound = buildRelayEmbed(sourceMessage, sourceConfig);
+  const outboundContent = buildRelayMessage(sourceMessage, sourceConfig);
 
   for (const [targetGuildId, targetConfig] of Object.entries(guilds)) {
     if (targetGuildId === sourceGuildId) {
@@ -173,7 +158,6 @@ async function relayMessage(sourceMessage) {
       if (!perms?.has([
         PermissionFlagsBits.ViewChannel,
         PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.EmbedLinks,
         PermissionFlagsBits.ManageWebhooks
       ])) {
         log('warn', 'missing_permissions_for_target', {
@@ -189,8 +173,8 @@ async function relayMessage(sourceMessage) {
       await webhookClient.send({
         username: `${sourceMessage.author.username} [${sourceMessage.guild.name}]`,
         avatarURL: sourceMessage.author.displayAvatarURL({ extension: 'png', size: 128 }),
-        content: outbound.content,
-        embeds: outbound.embeds,
+        content: outboundContent,
+        flags: MessageFlags.SuppressEmbeds,
         allowedMentions: { parse: [] }
       });
 
