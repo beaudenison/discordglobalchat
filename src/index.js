@@ -105,9 +105,18 @@ async function resolveReceiveWebhook(channel, guildConfig) {
 function buildRelayMessage(sourceMessage, replyNotice = '') {
   const serverName = sourceMessage.guild?.name || 'Unknown Server';
 
-  const messageContent = sourceMessage.content?.trim() || '[No text content]';
-  const replyLine = replyNotice ? `${replyNotice}\n` : '';
-  return `From <@${sourceMessage.author.id}> in ${serverName}: \n${replyLine}${messageContent}`;
+  const messageContent = sourceMessage.content?.trim() || '';
+  const lines = [`From <@${sourceMessage.author.id}> in ${serverName}: `];
+
+  if (replyNotice) {
+    lines.push(replyNotice);
+  }
+
+  if (messageContent) {
+    lines.push(messageContent);
+  }
+
+  return lines.join('\n');
 }
 
 function trackRelayMessage(relayedMessageId, sourceMessage) {
@@ -195,11 +204,15 @@ async function relayMessage(sourceMessage) {
         : '';
 
       const outboundContent = buildRelayMessage(sourceMessage, replyNotice);
+      const files = sourceMessage.attachments.size > 0
+        ? sourceMessage.attachments.map((attachment) => attachment.url)
+        : undefined;
 
       const relayedMessage = await webhookClient.send({
         username: 'Global Chat',
         avatarURL: sourceMessage.author.displayAvatarURL({ extension: 'png', size: 128 }),
         content: outboundContent,
+        files,
         flags: MessageFlags.SuppressEmbeds,
         allowedMentions: shouldNotifyReplyTarget
           ? { parse: [], users: [referencedRelay.sourceAuthorId] }
@@ -207,14 +220,6 @@ async function relayMessage(sourceMessage) {
       });
 
       trackRelayMessage(relayedMessage.id, sourceMessage);
-
-      if (sourceMessage.attachments.size > 0) {
-        const files = sourceMessage.attachments.map((attachment) => attachment.url);
-        await webhookClient.send({
-          files,
-          allowedMentions: { parse: [] }
-        });
-      }
 
       log('info', 'message_relayed', {
         sourceGuildId,
