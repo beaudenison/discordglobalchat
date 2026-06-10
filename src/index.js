@@ -170,7 +170,7 @@ async function relayMessage(sourceMessage) {
       const webhookClient = new WebhookClient({ id: webhook.id, token: webhook.token });
 
       await webhookClient.send({
-        username: `${sourceMessage.author.username} [${sourceMessage.guild.name}]`,
+        username: 'Global Chat',
         avatarURL: sourceMessage.author.displayAvatarURL({ extension: 'png', size: 128 }),
         content: outboundContent,
         flags: MessageFlags.SuppressEmbeds,
