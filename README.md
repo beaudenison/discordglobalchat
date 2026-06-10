@@ -1,6 +1,30 @@
-# Discord Global Chat Bot
+# Discord Global Chat Bot | Cross-Server Discord Chat Network
 
-Production-ready, containerized global chat relay bot for Discord using Node.js + discord.js.
+One bot. Every server. One conversation.
+
+Global Chat connects Discord servers into one live, cross-server conversation. Install the bot in your server, choose your send/receive channels, and instantly join a decentralized network of communities talking in real time.
+
+Website: https://discordglobalchat.xyz
+
+## What Is Discord Global Chat?
+
+Discord Global Chat is a production-ready, containerized global chat relay bot built with Node.js and discord.js. It links independent Discord communities together so messages can flow between connected servers without a centralized hub.
+
+As more servers install the bot, the network expands automatically. More servers means more people, more reach, and a larger community conversation.
+
+## Why Use Global Chat?
+
+### Cross-server feed
+Messages flow between connected Discord servers to create one shared conversation across communities.
+
+### Grows with the network
+Every new server increases network reach. Your community can instantly talk with people across the wider Global Chat network.
+
+### Admin-controlled channels
+Server admins choose exactly which channels broadcast outbound messages and which channels receive inbound messages.
+
+### Decentralized by design
+There is no single central chat hub. Servers connect organically into a member-driven network.
 
 ## One-Line Install
 
@@ -63,6 +87,14 @@ When a user posts in the configured broadcast channel:
 4. Delivered message includes:
 	- User reference via `<@UserID>`
 	- Server name in plain text attribution.
+	- Lightweight delivery acknowledgement to the sender (`sent to X servers`) that auto-removes quickly to reduce channel clutter.
+
+## Use Cases
+
+- Connect multiple friend-group servers into one active shared chat.
+- Let community servers discover and talk to each other in real time.
+- Build a distributed, network-style chat ecosystem without migrating communities to a single server.
+- Keep admin control local while participating in a larger global conversation.
 
 ## Project Structure
 
@@ -129,3 +161,7 @@ Defined in `.env`:
   - View Channel
   - Send Messages
   - Manage Webhooks
+
+## Keywords
+
+Discord global chat bot, cross-server Discord bot, Discord relay bot, decentralized Discord network, shared Discord feed, multi-server Discord chat, global Discord conversation, Discord community growth bot.
