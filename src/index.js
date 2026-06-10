@@ -113,22 +113,20 @@ async function resolveReceiveWebhook(channel, guildConfig) {
   return created;
 }
 
-function buildRelayMessage(sourceMessage, sourceGuildConfig) {
-  const fallbackInvite = sourceGuildConfig.serverInviteUrl || DEFAULT_SERVER_INVITE_URL || null;
+function buildRelayMessage(sourceMessage, sourceGuildConfig, replyNotice = '') {
   const serverName = sourceMessage.guild?.name || 'Unknown Server';
 
   const messageContent = sourceMessage.content?.trim() || '[No text content]';
-  const serverLabel = fallbackInvite
-    ? `[${serverName}](<${fallbackInvite}>)`
-    : serverName;
-  return `From <@${sourceMessage.author.id}> in ${serverLabel}: \n${messageContent}`;
+  const replyLine = replyNotice ? `${replyNotice}\n` : '';
+  return `From <@${sourceMessage.author.id}> in ${serverName}: \n${replyLine}${messageContent}`;
 }
 
 function trackRelayMessage(relayedMessageId, sourceMessage) {
   relayedMessageToSource.set(relayedMessageId, {
     sourceGuildId: sourceMessage.guild.id,
     sourceChannelId: sourceMessage.channel.id,
-    sourceMessageId: sourceMessage.id
+    sourceMessageId: sourceMessage.id,
+    sourceAuthorId: sourceMessage.author.id
   });
 
   // Keep a bounded cache so memory use does not grow without limit.
@@ -160,7 +158,9 @@ async function relayMessage(sourceMessage) {
     return;
   }
 
-  const outboundContent = buildRelayMessage(sourceMessage, sourceConfig);
+  const referencedRelay = sourceMessage.reference?.messageId
+    ? relayedMessageToSource.get(sourceMessage.reference.messageId)
+    : null;
 
   for (const [targetGuildId, targetConfig] of Object.entries(guilds)) {
     if (targetGuildId === sourceGuildId) {
@@ -196,12 +196,25 @@ async function relayMessage(sourceMessage) {
       const webhook = await resolveReceiveWebhook(targetChannel, targetConfig);
       const webhookClient = new WebhookClient({ id: webhook.id, token: webhook.token });
 
+      const shouldNotifyReplyTarget =
+        referencedRelay &&
+        targetGuildId === referencedRelay.sourceGuildId &&
+        referencedRelay.sourceAuthorId;
+
+      const replyNotice = shouldNotifyReplyTarget
+        ? `<@${referencedRelay.sourceAuthorId}>, this person replied to you.`
+        : '';
+
+      const outboundContent = buildRelayMessage(sourceMessage, sourceConfig, replyNotice);
+
       const relayedMessage = await webhookClient.send({
         username: 'Global Chat',
         avatarURL: sourceMessage.author.displayAvatarURL({ extension: 'png', size: 128 }),
         content: outboundContent,
         flags: MessageFlags.SuppressEmbeds,
-        allowedMentions: { parse: [] }
+        allowedMentions: shouldNotifyReplyTarget
+          ? { parse: [], users: [referencedRelay.sourceAuthorId] }
+          : { parse: [] }
       });
 
       trackRelayMessage(relayedMessage.id, sourceMessage);
