@@ -37,7 +37,7 @@ The setup wizard will:
 
 The setup script generates an invite URL with:
 - Scopes: `bot`, `applications.commands`
-- Permissions: `Manage Webhooks`, `Send Messages`, `Embed Links`
+- Permissions: `Manage Webhooks`, `Send Messages`
 
 Permission integer used: `536889344`.
 
@@ -47,7 +47,6 @@ Administrator-only commands:
 
 1. `/set-broadcast-channel [channel]`
 2. `/set-receive-channel [channel]`
-3. `/set-server-invite [url]` (optional but recommended for clickable server attribution)
 
 Channel routing behavior:
 - Same channel for both commands: fully bidirectional global room in one channel.
@@ -59,11 +58,11 @@ When a user posts in the configured broadcast channel:
 1. Bot ignores bot/webhook/system bot messages.
 2. Message is relayed to receive channels of all other configured guilds.
 3. Bot uses channel webhooks (created dynamically if needed) to preserve sender identity context:
-	- Username format: `Username [ServerName]`
+	- Username: `Global Chat`
 	- Avatar: sender avatar
 4. Delivered message includes:
 	- User reference via `<@UserID>`
-	- Server label with markdown link if invite is configured.
+	- Server name in plain text attribution.
 
 ## Project Structure
 
@@ -115,7 +114,6 @@ Defined in `.env`:
 - `CLIENT_ID` (required)
 - `DATA_FILE` (default: `/app/data/config.json`)
 - `LOG_LEVEL` (default: `info`)
-- `DEFAULT_SERVER_INVITE_URL` (optional fallback invite)
 
 ## Security Notes
 
@@ -130,5 +128,4 @@ Defined in `.env`:
 - Ensure bot has channel permissions in every target receive channel:
   - View Channel
   - Send Messages
-  - Embed Links
   - Manage Webhooks

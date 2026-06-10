@@ -20,16 +20,6 @@ export const commandBuilders = [
         .setDescription('The inbound receive channel')
         .setRequired(true)
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-  new SlashCommandBuilder()
-    .setName('set-server-invite')
-    .setDescription('Set a permanent invite URL used for server attribution in relayed messages')
-    .addStringOption((option) =>
-      option
-        .setName('url')
-        .setDescription('Permanent invite URL (e.g. https://discord.gg/yourcode)')
-        .setRequired(true)
-    )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ];
 

@@ -18,7 +18,6 @@ import { JsonStore } from './storage.js';
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const DATA_FILE = process.env.DATA_FILE || '/app/data/config.json';
-const DEFAULT_SERVER_INVITE_URL = process.env.DEFAULT_SERVER_INVITE_URL || '';
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
 
 if (!BOT_TOKEN || !CLIENT_ID) {
@@ -65,16 +64,6 @@ function userIsAdmin(interaction) {
   return interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
 }
 
-function validInviteUrl(url) {
-  try {
-    const parsed = new URL(url);
-    const hostOk = parsed.hostname === 'discord.gg' || parsed.hostname.endsWith('discord.com');
-    return parsed.protocol === 'https:' && hostOk;
-  } catch {
-    return false;
-  }
-}
-
 async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
   await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commandsJson });
@@ -113,7 +102,7 @@ async function resolveReceiveWebhook(channel, guildConfig) {
   return created;
 }
 
-function buildRelayMessage(sourceMessage, sourceGuildConfig, replyNotice = '') {
+function buildRelayMessage(sourceMessage, replyNotice = '') {
   const serverName = sourceMessage.guild?.name || 'Unknown Server';
 
   const messageContent = sourceMessage.content?.trim() || '[No text content]';
@@ -205,7 +194,7 @@ async function relayMessage(sourceMessage) {
         ? `<@${referencedRelay.sourceAuthorId}>, this person replied to you.`
         : '';
 
-      const outboundContent = buildRelayMessage(sourceMessage, sourceConfig, replyNotice);
+      const outboundContent = buildRelayMessage(sourceMessage, replyNotice);
 
       const relayedMessage = await webhookClient.send({
         username: 'Global Chat',
@@ -318,23 +307,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  if (interaction.commandName === 'set-server-invite') {
-    const url = interaction.options.getString('url', true).trim();
-    if (!validInviteUrl(url)) {
-      await interaction.reply({
-        content: 'Please provide a valid https Discord invite URL.',
-        ephemeral: true
-      });
-      return;
-    }
-
-    store.upsertGuild(guildId, { serverInviteUrl: url });
-
-    await interaction.reply({
-      content: 'Server invite URL saved and will be used in relayed message attribution.',
-      ephemeral: true
-    });
-  }
 });
 
 client.on(Events.MessageCreate, async (message) => {
