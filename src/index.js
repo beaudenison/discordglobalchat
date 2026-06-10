@@ -143,6 +143,32 @@ function resolveReactionEmoji(reaction) {
   return reaction.emoji.name || null;
 }
 
+async function sendDeliveryAcknowledgement(sourceMessage, deliveredCount) {
+  const serverLabel = deliveredCount === 1 ? 'server' : 'servers';
+
+  try {
+    const ackMessage = await sourceMessage.reply({
+      // Discord renders "-#" as smaller subtext, which keeps this unobtrusive.
+      content: `-# sent to ${deliveredCount} ${serverLabel}`,
+      allowedMentions: { parse: [], repliedUser: false }
+    });
+
+    const removeAckDelayMs = 12000;
+    const timer = setTimeout(() => {
+      ackMessage.delete().catch(() => {});
+    }, removeAckDelayMs);
+    timer.unref?.();
+  } catch (error) {
+    log('warn', 'delivery_acknowledgement_failed', {
+      guildId: sourceMessage.guild?.id,
+      channelId: sourceMessage.channel?.id,
+      messageId: sourceMessage.id,
+      deliveredCount,
+      error: error.message
+    });
+  }
+}
+
 async function relayMessage(sourceMessage) {
   const sourceGuildId = sourceMessage.guild.id;
   const guilds = store.getAllGuilds();
@@ -155,6 +181,8 @@ async function relayMessage(sourceMessage) {
   if (sourceConfig.broadcastChannelId !== sourceMessage.channel.id) {
     return;
   }
+
+  let deliveredCount = 0;
 
   const referencedRelay = sourceMessage.reference?.messageId
     ? relayedMessageToSource.get(sourceMessage.reference.messageId)
@@ -220,6 +248,7 @@ async function relayMessage(sourceMessage) {
       });
 
       trackRelayMessage(relayedMessage.id, sourceMessage);
+      deliveredCount += 1;
 
       log('info', 'message_relayed', {
         sourceGuildId,
@@ -237,6 +266,8 @@ async function relayMessage(sourceMessage) {
       });
     }
   }
+
+  await sendDeliveryAcknowledgement(sourceMessage, deliveredCount);
 }
 
 client.once(Events.ClientReady, async (readyClient) => {
