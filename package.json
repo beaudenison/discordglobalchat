@@ -1,0 +1,19 @@
+{
+  "name": "discordglobalchat",
+  "version": "1.0.0",
+  "description": "Production-ready Discord global chat relay bot",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "lint": "node --check src/index.js && node --check src/storage.js && node --check src/commands.js",
+    "dev": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.4.5"
+  }
+}
