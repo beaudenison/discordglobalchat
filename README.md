@@ -99,10 +99,10 @@ When a user posts in the configured broadcast channel:
 2. Message is relayed to receive channels of all other configured guilds.
 3. Bot uses channel webhooks (created dynamically if needed) to preserve sender identity context:
 	- Username: `Global Chat`
-	- Avatar: sender avatar
+	- Avatar: bot application icon
 4. Delivered message includes:
-	- User reference via `<@UserID>`
-	- Server name in plain text attribution.
+	- A styled embed with sender mention, server name, and channel attribution.
+	- An automatic `Join Server` button with an invite URL created by the bot (no manual invite setup).
 	- Lightweight delivery acknowledgement to the sender (`sent to X servers`) that auto-removes quickly to reduce channel clutter.
 
 ## Use Cases

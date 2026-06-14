@@ -1,11 +1,14 @@
 import 'dotenv/config';
 import process from 'node:process';
 import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ChannelType,
   Client,
+  EmbedBuilder,
   Events,
   GatewayIntentBits,
-  MessageFlags,
   Partials,
   PermissionFlagsBits,
   REST,
@@ -28,6 +31,7 @@ if (!BOT_TOKEN || !CLIENT_ID) {
 
 const store = new JsonStore(DATA_FILE);
 const relayedMessageToSource = new Map();
+const inviteCache = new Map();
 
 const client = new Client({
   intents: [
@@ -102,21 +106,118 @@ async function resolveReceiveWebhook(channel, guildConfig) {
   return created;
 }
 
-function buildRelayMessage(sourceMessage, replyNotice = '') {
+function buildRelayEmbed(sourceMessage, replyNotice = '') {
   const serverName = sourceMessage.guild?.name || 'Unknown Server';
-
   const messageContent = sourceMessage.content?.trim() || '';
-  const lines = [`From <@${sourceMessage.author.id}> in ${serverName}: `];
+
+  const embed = new EmbedBuilder()
+    .setColor(0x3ba55d)
+    .setTitle(`Global Chat | ${serverName}`)
+    .setDescription(messageContent || '*Sent a message with no text content.*')
+    .addFields(
+      {
+        name: 'From',
+        value: `<@${sourceMessage.author.id}>`,
+        inline: true
+      },
+      {
+        name: 'Source Channel',
+        value: `<#${sourceMessage.channel.id}>`,
+        inline: true
+      }
+    )
+    .setTimestamp(sourceMessage.createdAt)
+    .setFooter({ text: 'Discord Global Chat' });
+
+  const firstImage = sourceMessage.attachments.find((attachment) =>
+    attachment.contentType?.startsWith('image/')
+  );
+  if (firstImage) {
+    embed.setImage(firstImage.url);
+  }
 
   if (replyNotice) {
-    lines.push(replyNotice);
+    embed.addFields({
+      name: 'Reply Notice',
+      value: 'This post is replying to a relayed message.',
+      inline: false
+    });
   }
 
-  if (messageContent) {
-    lines.push(messageContent);
+  return embed;
+}
+
+async function tryCreateInviteForChannel(channel) {
+  if (!channel || channel.type !== ChannelType.GuildText) {
+    return null;
   }
 
-  return lines.join('\n');
+  const me = channel.guild.members.me;
+  const perms = channel.permissionsFor(me);
+  if (!perms?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.CreateInstantInvite])) {
+    return null;
+  }
+
+  const invite = await channel.createInvite({
+    maxAge: 0,
+    maxUses: 0,
+    temporary: false,
+    unique: false,
+    reason: 'Global chat join button auto-generated invite'
+  });
+
+  return invite.url;
+}
+
+async function resolveJoinInviteUrl(sourceGuild, preferredChannelId) {
+  const cached = inviteCache.get(sourceGuild.id);
+  if (cached) {
+    return cached;
+  }
+
+  let inviteUrl = null;
+
+  if (preferredChannelId) {
+    try {
+      const preferredChannel = await sourceGuild.channels.fetch(preferredChannelId);
+      inviteUrl = await tryCreateInviteForChannel(preferredChannel);
+    } catch {
+      inviteUrl = null;
+    }
+  }
+
+  if (!inviteUrl) {
+    const channels = await sourceGuild.channels.fetch();
+    for (const channel of channels.values()) {
+      try {
+        inviteUrl = await tryCreateInviteForChannel(channel);
+      } catch {
+        inviteUrl = null;
+      }
+
+      if (inviteUrl) {
+        break;
+      }
+    }
+  }
+
+  if (!inviteUrl) {
+    try {
+      const vanityData = await sourceGuild.fetchVanityData();
+      if (vanityData?.code) {
+        inviteUrl = `https://discord.gg/${vanityData.code}`;
+      }
+    } catch {
+      inviteUrl = null;
+    }
+  }
+
+  if (!inviteUrl) {
+    return null;
+  }
+
+  inviteCache.set(sourceGuild.id, inviteUrl);
+  return inviteUrl;
 }
 
 function trackRelayMessage(relayedMessageId, sourceMessage) {
@@ -182,6 +283,18 @@ async function relayMessage(sourceMessage) {
     return;
   }
 
+  let joinInviteUrl = null;
+  try {
+    joinInviteUrl = await resolveJoinInviteUrl(sourceMessage.guild, sourceConfig.broadcastChannelId);
+  } catch (error) {
+    log('warn', 'join_invite_resolution_failed', {
+      guildId: sourceGuildId,
+      channelId: sourceMessage.channel.id,
+      messageId: sourceMessage.id,
+      error: error.message
+    });
+  }
+
   let deliveredCount = 0;
 
   const referencedRelay = sourceMessage.reference?.messageId
@@ -231,17 +344,29 @@ async function relayMessage(sourceMessage) {
         ? `<@${referencedRelay.sourceAuthorId}>, this person replied to you.`
         : '';
 
-      const outboundContent = buildRelayMessage(sourceMessage, replyNotice);
+      const embed = buildRelayEmbed(sourceMessage, replyNotice);
       const files = sourceMessage.attachments.size > 0
         ? sourceMessage.attachments.map((attachment) => attachment.url)
         : undefined;
 
+      const components = joinInviteUrl
+        ? [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setLabel('Join Server')
+              .setStyle(ButtonStyle.Link)
+              .setURL(joinInviteUrl)
+          )
+        ]
+        : undefined;
+
       const relayedMessage = await webhookClient.send({
         username: 'Global Chat',
-        avatarURL: sourceMessage.author.displayAvatarURL({ extension: 'png', size: 128 }),
-        content: outboundContent,
+        avatarURL: client.user?.displayAvatarURL({ extension: 'png', size: 128 }),
+        content: replyNotice || undefined,
+        embeds: [embed],
+        components,
         files,
-        flags: MessageFlags.SuppressEmbeds,
         allowedMentions: shouldNotifyReplyTarget
           ? { parse: [], users: [referencedRelay.sourceAuthorId] }
           : { parse: [] }
