@@ -1,9 +1,6 @@
 import 'dotenv/config';
 import process from 'node:process';
 import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   ChannelType,
   Client,
   EmbedBuilder,
@@ -106,43 +103,15 @@ async function resolveReceiveWebhook(channel, guildConfig) {
   return created;
 }
 
-function buildRelayEmbed(sourceMessage, replyNotice = '') {
-  const serverName = sourceMessage.guild?.name || 'Unknown Server';
+function buildRelayEmbed(sourceMessage, joinInviteUrl, connectedServerCount) {
   const messageContent = sourceMessage.content?.trim() || '';
+  const inviteLine = joinInviteUrl || 'Invite unavailable';
 
   const embed = new EmbedBuilder()
     .setColor(0x3ba55d)
-    .setTitle(`Global Chat | ${serverName}`)
-    .setDescription(messageContent || '*Sent a message with no text content.*')
-    .addFields(
-      {
-        name: 'From',
-        value: `<@${sourceMessage.author.id}>`,
-        inline: true
-      },
-      {
-        name: 'Source Channel',
-        value: `<#${sourceMessage.channel.id}>`,
-        inline: true
-      }
-    )
+    .setDescription(`From <@${sourceMessage.author.id}> | ${inviteLine}\n\n${messageContent || '*Sent a message with no text content.*'}`)
     .setTimestamp(sourceMessage.createdAt)
-    .setFooter({ text: 'Discord Global Chat' });
-
-  const firstImage = sourceMessage.attachments.find((attachment) =>
-    attachment.contentType?.startsWith('image/')
-  );
-  if (firstImage) {
-    embed.setImage(firstImage.url);
-  }
-
-  if (replyNotice) {
-    embed.addFields({
-      name: 'Reply Notice',
-      value: 'This post is replying to a relayed message.',
-      inline: false
-    });
-  }
+    .setFooter({ text: `Connected to ${connectedServerCount} servers` });
 
   return embed;
 }
@@ -283,6 +252,10 @@ async function relayMessage(sourceMessage) {
     return;
   }
 
+  const connectedServerCount = Object.values(guilds).filter(
+    (config) => config.broadcastChannelId && config.receiveChannelId
+  ).length;
+
   let joinInviteUrl = null;
   try {
     joinInviteUrl = await resolveJoinInviteUrl(sourceMessage.guild, sourceConfig.broadcastChannelId);
@@ -344,20 +317,9 @@ async function relayMessage(sourceMessage) {
         ? `<@${referencedRelay.sourceAuthorId}>, this person replied to you.`
         : '';
 
-      const embed = buildRelayEmbed(sourceMessage, replyNotice);
+      const embed = buildRelayEmbed(sourceMessage, joinInviteUrl, connectedServerCount);
       const files = sourceMessage.attachments.size > 0
         ? sourceMessage.attachments.map((attachment) => attachment.url)
-        : undefined;
-
-      const components = joinInviteUrl
-        ? [
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setLabel('Join Server')
-              .setStyle(ButtonStyle.Link)
-              .setURL(joinInviteUrl)
-          )
-        ]
         : undefined;
 
       const relayedMessage = await webhookClient.send({
@@ -365,7 +327,6 @@ async function relayMessage(sourceMessage) {
         avatarURL: client.user?.displayAvatarURL({ extension: 'png', size: 128 }),
         content: replyNotice || undefined,
         embeds: [embed],
-        components,
         files,
         allowedMentions: shouldNotifyReplyTarget
           ? { parse: [], users: [referencedRelay.sourceAuthorId] }
