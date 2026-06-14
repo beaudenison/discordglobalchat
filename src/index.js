@@ -109,7 +109,8 @@ function buildRelayMessage(sourceMessage) {
   const serverName = sourceMessage.guild?.name || 'Unknown Server';
   const messageContent = sourceMessage.content?.trim() || '';
 
-  const lines = [`From <@${sourceMessage.author.id}> in ${serverName}`];
+  const lines = [`-# From <@${sourceMessage.author.id}> in ${serverName}:`];
+  lines.push('');
   lines.push(messageContent || '*Sent a message with no text content.*');
 
   return lines.join('\n');
@@ -321,7 +322,7 @@ async function relayMessage(sourceMessage) {
         ? [
           new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-              .setLabel(`Join ${sourceMessage.author.username}`)
+              .setLabel(`Join ${sourceMessage.guild?.name || 'Server'}`.slice(0, 80))
               .setStyle(ButtonStyle.Link)
               .setURL(joinInviteUrl)
           )
