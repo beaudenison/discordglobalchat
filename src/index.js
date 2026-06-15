@@ -324,31 +324,16 @@ async function relayMessage(sourceMessage) {
         ? sourceMessage.attachments.map((attachment) => attachment.url)
         : undefined;
 
-      const sourceProfileName =
-        sourceMessage.member?.displayName ||
-        sourceMessage.author?.globalName ||
-        sourceMessage.author?.username ||
-        'User';
-      const addFriendUrl = `https://discord.com/users/${sourceMessage.author.id}`;
-      const actionButtons = [];
-
-      if (joinInviteUrl) {
-        actionButtons.push(
-          new ButtonBuilder()
-            .setLabel(`Join ${sourceMessage.guild?.name || 'Server'}`.slice(0, 80))
-            .setStyle(ButtonStyle.Link)
-            .setURL(joinInviteUrl)
-        );
-      }
-
-      actionButtons.push(
-        new ButtonBuilder()
-          .setLabel(`Add ${sourceProfileName}`.slice(0, 80))
-          .setStyle(ButtonStyle.Link)
-          .setURL(addFriendUrl)
-      );
-
-      const components = [new ActionRowBuilder().addComponents(actionButtons)];
+      const components = joinInviteUrl
+        ? [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setLabel('Join')
+              .setStyle(ButtonStyle.Link)
+              .setURL(joinInviteUrl)
+          )
+        ]
+        : undefined;
 
       const relayedMessage = await webhookClient.send({
         username: 'Global Chat',
