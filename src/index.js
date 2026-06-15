@@ -221,24 +221,19 @@ function resolveReactionEmoji(reaction) {
 
 async function sendDeliveryAcknowledgement(sourceMessage, deliveredCount) {
   const serverLabel = deliveredCount === 1 ? 'server' : 'servers';
-  const messageLine = sourceMessage.content?.trim() || '*Sent a message with no text content.*';
-  const updatedContent = `${messageLine}\n--------\n-# Sent to ${deliveredCount} ${serverLabel}`;
+  const acknowledgementContent = `-# Sent to ${deliveredCount} ${serverLabel}`;
 
   try {
-    if (!sourceMessage.editable) {
-      log('warn', 'delivery_acknowledgement_not_editable', {
-        guildId: sourceMessage.guild?.id,
-        channelId: sourceMessage.channel?.id,
-        messageId: sourceMessage.id,
-        deliveredCount
-      });
-      return;
-    }
-
-    await sourceMessage.edit({
-      content: updatedContent,
-      allowedMentions: { parse: [] }
+    const ackMessage = await sourceMessage.reply({
+      content: acknowledgementContent,
+      allowedMentions: { parse: [], repliedUser: false }
     });
+
+    const removeAckDelayMs = 2500;
+    const timer = setTimeout(() => {
+      ackMessage.delete().catch(() => {});
+    }, removeAckDelayMs);
+    timer.unref?.();
   } catch (error) {
     log('warn', 'delivery_acknowledgement_failed', {
       guildId: sourceMessage.guild?.id,
@@ -329,16 +324,31 @@ async function relayMessage(sourceMessage) {
         ? sourceMessage.attachments.map((attachment) => attachment.url)
         : undefined;
 
-      const components = joinInviteUrl
-        ? [
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setLabel(`Join ${sourceMessage.guild?.name || 'Server'}`.slice(0, 80))
-              .setStyle(ButtonStyle.Link)
-              .setURL(joinInviteUrl)
-          )
-        ]
-        : undefined;
+      const sourceProfileName =
+        sourceMessage.member?.displayName ||
+        sourceMessage.author?.globalName ||
+        sourceMessage.author?.username ||
+        'User';
+      const addFriendUrl = `https://discord.com/users/${sourceMessage.author.id}`;
+      const actionButtons = [];
+
+      if (joinInviteUrl) {
+        actionButtons.push(
+          new ButtonBuilder()
+            .setLabel(`Join ${sourceMessage.guild?.name || 'Server'}`.slice(0, 80))
+            .setStyle(ButtonStyle.Link)
+            .setURL(joinInviteUrl)
+        );
+      }
+
+      actionButtons.push(
+        new ButtonBuilder()
+          .setLabel(`Add ${sourceProfileName}`.slice(0, 80))
+          .setStyle(ButtonStyle.Link)
+          .setURL(addFriendUrl)
+      );
+
+      const components = [new ActionRowBuilder().addComponents(actionButtons)];
 
       const relayedMessage = await webhookClient.send({
         username: 'Global Chat',
