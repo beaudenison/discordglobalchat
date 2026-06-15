@@ -107,11 +107,17 @@ async function resolveReceiveWebhook(channel, guildConfig) {
 
 function buildRelayMessage(sourceMessage) {
   const serverName = sourceMessage.guild?.name || 'Unknown Server';
+  const senderProfileName =
+    sourceMessage.member?.displayName ||
+    sourceMessage.author?.globalName ||
+    sourceMessage.author?.username ||
+    'Unknown User';
   const messageContent = sourceMessage.content?.trim() || '';
 
-  const lines = [`-# From <@${sourceMessage.author.id}> in ${serverName}:`];
-  lines.push('');
+  const lines = [`-# From ${senderProfileName} in ${serverName}:`];
+  lines.push('------');
   lines.push(messageContent || '*Sent a message with no text content.*');
+  lines.push('------');
 
   return lines.join('\n');
 }
@@ -215,19 +221,24 @@ function resolveReactionEmoji(reaction) {
 
 async function sendDeliveryAcknowledgement(sourceMessage, deliveredCount) {
   const serverLabel = deliveredCount === 1 ? 'server' : 'servers';
+  const messageLine = sourceMessage.content?.trim() || '*Sent a message with no text content.*';
+  const updatedContent = `${messageLine}\n--------\n-# Sent to ${deliveredCount} ${serverLabel}`;
 
   try {
-    const ackMessage = await sourceMessage.reply({
-      // Discord renders "-#" as smaller subtext, which keeps this unobtrusive.
-      content: `-# sent to ${deliveredCount} ${serverLabel}`,
-      allowedMentions: { parse: [], repliedUser: false }
-    });
+    if (!sourceMessage.editable) {
+      log('warn', 'delivery_acknowledgement_not_editable', {
+        guildId: sourceMessage.guild?.id,
+        channelId: sourceMessage.channel?.id,
+        messageId: sourceMessage.id,
+        deliveredCount
+      });
+      return;
+    }
 
-    const removeAckDelayMs = 1000;
-    const timer = setTimeout(() => {
-      ackMessage.delete().catch(() => {});
-    }, removeAckDelayMs);
-    timer.unref?.();
+    await sourceMessage.edit({
+      content: updatedContent,
+      allowedMentions: { parse: [] }
+    });
   } catch (error) {
     log('warn', 'delivery_acknowledgement_failed', {
       guildId: sourceMessage.guild?.id,
